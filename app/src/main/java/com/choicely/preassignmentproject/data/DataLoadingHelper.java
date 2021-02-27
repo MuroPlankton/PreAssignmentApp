@@ -27,8 +27,13 @@ import okhttp3.Request;
 public class DataLoadingHelper {
 
     private static DataLoadingHelper instance;
-    private OkHttpClient client = new OkHttpClient();
+    private OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS).build();
+
     private List<String> alreadyLoadedManufacturers = new ArrayList<>();
+    private int manufacturersSaved = 0;
 
     private BlockingQueue<Runnable> downloadQueue = new LinkedBlockingQueue<>();
     private ThreadPoolExecutor downloadExecutor = new ThreadPoolExecutor(1,
@@ -36,8 +41,6 @@ public class DataLoadingHelper {
             TimeUnit.MILLISECONDS, downloadQueue);
 
     private ExecutorService realmExecutorService = Executors.newSingleThreadExecutor();
-
-    private boolean hasReTried;
 
     private DataLoadingHelper(Context context) {
         realmExecutorService.execute(() -> Realm.init(context));
@@ -50,51 +53,27 @@ public class DataLoadingHelper {
         return instance;
     }
 
-//    public void loadAllItemsToRealm() {
-//        downloadCategoryForSaving("gloves");
-//        downloadCategoryForSaving("facemasks");
-//        downloadCategoryForSaving("beanies");
-//    }
-
     private void toastMainThread(String message, Context activityContext) {
         ((Activity) activityContext).runOnUiThread(() -> Toast.makeText(activityContext, message, Toast.LENGTH_LONG).show());
     }
 
     public void downloadCategoryForSaving(String category, Context activityContext) {
         downloadExecutor.execute(() -> {
-            Request categoryRequest = new Request.Builder()
-                    .url(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
-                            category)).get().build();
+            final JSONArray itemCategoryArray = requestData(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
+                    category), activityContext, true);
 
-            JSONArray itemCategoryArray = null;
-            try {
-                String itemCategoryString = client.newCall(categoryRequest).execute().body().string();
-                if (!itemCategoryString.equals("[]")) {
-                    itemCategoryArray = new JSONArray(itemCategoryString);
-                    toastMainThread(String.format("%s downloaded. Third of the way done!", category), activityContext);
-                } else {
-                    if (!hasReTried) {
-                        downloadCategoryForSaving(category, activityContext);
-                        hasReTried = true;
-                        toastMainThread(String.format("Couldn't download %s! Trying again...", category), activityContext);
-                    } else {
-                        toastMainThread(String.format("Failed to download %s again! Try again later.", category), activityContext);
-                    }
-                }
-
-
-            } catch (Exception e) {
-                e.printStackTrace();
+            if (itemCategoryArray == null) {
+                downloadCategoryForSaving(category, activityContext);
+            } else {
+                realmExecutorService.execute(() -> saveDownloadedCategory(itemCategoryArray, activityContext));
             }
-
-            final JSONArray finalItemCategoryArray = itemCategoryArray;
-            realmExecutorService.execute(() -> saveDownloadedCategory(finalItemCategoryArray, activityContext));
-
-            //TODO: make the return values work maybe
         });
     }
 
     private void saveDownloadedCategory(JSONArray categoryArray, Context context) {
+        List<String> manufacturerList = alreadyLoadedManufacturers;
+        long startTime = System.currentTimeMillis();
+
         try {
             for (int index = 0; index < categoryArray.length(); index++) {
                 JSONObject itemDataJsonObject = categoryArray.getJSONObject(index);
@@ -107,9 +86,9 @@ public class DataLoadingHelper {
 
                 String itemManufacturer = itemDataJsonObject.getString("manufacturer");
                 itemData.setManufacturer(itemManufacturer);
-                if (!alreadyLoadedManufacturers.contains(itemManufacturer)) {
-                    alreadyLoadedManufacturers.add(itemManufacturer);
-                    //TODO: download new manufacturer
+                if (!manufacturerList.contains(itemManufacturer)) {
+                    manufacturerList.add(itemManufacturer);
+                    downloadManufacturerAvailabilityForSaving(itemManufacturer, context);
                 }
 
                 JSONArray itemColorJsonArray = itemDataJsonObject.getJSONArray("color");
@@ -128,10 +107,78 @@ public class DataLoadingHelper {
             e.printStackTrace();
         }
 
+        Log.d("DataLoadingHelper", "saveDownloadedCategory: amount of seconds it took to save downloaded category: " + (System.currentTimeMillis() - startTime) / 1000);
+        alreadyLoadedManufacturers = manufacturerList;
         toastMainThread("Almost there! Loading...", context);
     }
 
-    public void loadAvailabilityInfoToRealm() {
+    private void downloadManufacturerAvailabilityForSaving(String manufacturer, Context context) {
+        downloadExecutor.submit(() -> {
+            final JSONArray availabilityArray = requestData(
+                    String.format("https://bad-api-assignment.reaktor.com/v2/availability/%s",
+                            manufacturer), context, false);
 
+            if (availabilityArray == null) {
+                downloadManufacturerAvailabilityForSaving(manufacturer, context);
+            } else {
+                realmExecutorService.execute(() -> {
+                    saveDownloadedAvailabilityInfo(availabilityArray, context);
+                });
+            }
+        });
+    }
+
+    private void saveDownloadedAvailabilityInfo(JSONArray availabilityArray, Context context) {
+        long startTime = System.currentTimeMillis();
+        try {
+            for (int index = 0; index < availabilityArray.length(); index++) {
+                JSONObject itemDataJsonObject = availabilityArray.getJSONObject(index);
+
+                ItemData itemData = new ItemData();
+                itemData.setItemId(itemDataJsonObject.getString("id").toLowerCase());
+
+                String dataPayload = itemDataJsonObject.getString("DATAPAYLOAD");
+                itemData.setAvailable(!dataPayload.contains("OUTOFSTOCK"));
+
+                Realm realm = Realm.getDefaultInstance();
+                realm.beginTransaction();
+                realm.copyToRealmOrUpdate(itemData);
+                realm.commitTransaction();
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        Log.d("DataLoadingHelper", "saveDownloadedAvailabilityInfo: one manufacturer saved to realm in " + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
+        manufacturersSaved++;
+        if (manufacturersSaved == alreadyLoadedManufacturers.size() - 1) {
+            toastMainThread("All of the data has been saved!", context);
+        }
+    }
+
+    private JSONArray requestData(String link, Context context, boolean isCategory) {
+        Request request = new Request.Builder()
+                .url(link).get().build();
+
+        JSONArray responseArray = null;
+        try {
+            String responseString = client.newCall(request).execute().body().string();
+            if (!responseString.contains("[]")) {
+                if (isCategory) {
+                    responseArray = new JSONArray(responseString);
+                } else {
+                    responseArray = new JSONObject(responseString).getJSONArray("response");
+                }
+                toastMainThread(String.format("Category or availability information downloaded."), context);
+            } else {
+                toastMainThread(String.format("Couldn't download data! Trying again..."), context);
+                Thread.sleep(5000);
+                return null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return responseArray;
     }
 }
