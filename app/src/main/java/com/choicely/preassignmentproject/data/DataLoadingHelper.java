@@ -5,13 +5,12 @@ import android.content.Context;
 import android.util.Log;
 import android.widget.Toast;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,7 +58,7 @@ public class DataLoadingHelper {
 
     public void downloadCategoryForSaving(String category, Context activityContext) {
         downloadExecutor.execute(() -> {
-            final JSONArray itemCategoryArray = requestData(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
+            final JsonArray itemCategoryArray = requestData(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
                     category), activityContext, true);
 
             if (itemCategoryArray == null) {
@@ -70,41 +69,37 @@ public class DataLoadingHelper {
         });
     }
 
-    private void saveDownloadedCategory(JSONArray categoryArray, Context context) {
+    private void saveDownloadedCategory(JsonArray categoryArray, Context context) {
         List<String> manufacturerList = alreadyLoadedManufacturers;
         long startTime = System.currentTimeMillis();
 
-        try {
-            for (int index = 0; index < categoryArray.length(); index++) {
-                JSONObject itemDataJsonObject = categoryArray.getJSONObject(index);
+        for (int index = 0; index < categoryArray.size(); index++) {
+            JsonObject itemDataJsonObject = categoryArray.get(index).getAsJsonObject();
 
-                ItemData itemData = new ItemData();
-                itemData.setItemId(itemDataJsonObject.getString("id"));
-                itemData.setItemName(itemDataJsonObject.getString("name"));
-                itemData.setCategory(itemDataJsonObject.getString("type"));
-                itemData.setPrice(itemDataJsonObject.getInt("price"));
+            ItemData itemData = new ItemData();
+            itemData.setItemId(itemDataJsonObject.get("id").getAsString());
+            itemData.setItemName(itemDataJsonObject.get("name").getAsString());
+            itemData.setCategory(itemDataJsonObject.get("type").getAsString());
+            itemData.setPrice(itemDataJsonObject.get("price").getAsInt());
 
-                String itemManufacturer = itemDataJsonObject.getString("manufacturer");
-                itemData.setManufacturer(itemManufacturer);
-                if (!manufacturerList.contains(itemManufacturer)) {
-                    manufacturerList.add(itemManufacturer);
-                    downloadManufacturerAvailabilityForSaving(itemManufacturer, context);
-                }
-
-                JSONArray itemColorJsonArray = itemDataJsonObject.getJSONArray("color");
-                RealmList<String> itemColorList = new RealmList<>();
-                for (int i = 0; i < itemColorJsonArray.length(); i++) {
-                    itemColorList.add(itemColorJsonArray.getString(i));
-                }
-                itemData.setItemColor(itemColorList);
-
-                Realm realm = Realm.getDefaultInstance();
-                realm.beginTransaction();
-                realm.copyToRealmOrUpdate(itemData);
-                realm.commitTransaction();
+            String itemManufacturer = itemDataJsonObject.get("manufacturer").getAsString();
+            itemData.setManufacturer(itemManufacturer);
+            if (!manufacturerList.contains(itemManufacturer)) {
+                manufacturerList.add(itemManufacturer);
+                downloadManufacturerAvailabilityForSaving(itemManufacturer, context);
             }
-        } catch (JSONException e) {
-            e.printStackTrace();
+
+            JsonArray itemColorJsonArray = itemDataJsonObject.getAsJsonArray("color");
+            RealmList<String> itemColorList = new RealmList<>();
+            for (int i = 0; i < itemColorJsonArray.size(); i++) {
+                itemColorList.add(itemColorJsonArray.get(i).getAsString());
+            }
+            itemData.setItemColor(itemColorList);
+
+            Realm realm = Realm.getDefaultInstance();
+            realm.beginTransaction();
+            realm.copyToRealmOrUpdate(itemData);
+            realm.commitTransaction();
         }
 
         Log.d("DataLoadingHelper", "saveDownloadedCategory: amount of seconds it took to save downloaded category: " + (System.currentTimeMillis() - startTime) / 1000);
@@ -114,7 +109,7 @@ public class DataLoadingHelper {
 
     private void downloadManufacturerAvailabilityForSaving(String manufacturer, Context context) {
         downloadExecutor.submit(() -> {
-            final JSONArray availabilityArray = requestData(
+            final JsonArray availabilityArray = requestData(
                     String.format("https://bad-api-assignment.reaktor.com/v2/availability/%s",
                             manufacturer), context, false);
 
@@ -128,25 +123,21 @@ public class DataLoadingHelper {
         });
     }
 
-    private void saveDownloadedAvailabilityInfo(JSONArray availabilityArray, Context context) {
+    private void saveDownloadedAvailabilityInfo(JsonArray availabilityArray, Context context) {
         long startTime = System.currentTimeMillis();
-        try {
-            for (int index = 0; index < availabilityArray.length(); index++) {
-                JSONObject itemDataJsonObject = availabilityArray.getJSONObject(index);
+        for (int index = 0; index < availabilityArray.size(); index++) {
+            JsonObject itemDataJsonObject = availabilityArray.get(index).getAsJsonObject();
 
-                ItemData itemData = new ItemData();
-                itemData.setItemId(itemDataJsonObject.getString("id").toLowerCase());
+            ItemData itemData = new ItemData();
+            itemData.setItemId(itemDataJsonObject.get("id").getAsString().toLowerCase());
 
-                String dataPayload = itemDataJsonObject.getString("DATAPAYLOAD");
-                itemData.setAvailable(!dataPayload.contains("OUTOFSTOCK"));
+            String dataPayload = itemDataJsonObject.get("DATAPAYLOAD").getAsString();
+            itemData.setAvailable(!dataPayload.contains("OUTOFSTOCK"));
 
-                Realm realm = Realm.getDefaultInstance();
-                realm.beginTransaction();
-                realm.copyToRealmOrUpdate(itemData);
-                realm.commitTransaction();
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
+            Realm realm = Realm.getDefaultInstance();
+            realm.beginTransaction();
+            realm.copyToRealmOrUpdate(itemData);
+            realm.commitTransaction();
         }
 
         Log.d("DataLoadingHelper", "saveDownloadedAvailabilityInfo: one manufacturer saved to realm in " + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
@@ -156,18 +147,18 @@ public class DataLoadingHelper {
         }
     }
 
-    private JSONArray requestData(String link, Context context, boolean isCategory) {
+    private JsonArray requestData(String link, Context context, boolean isCategory) {
         Request request = new Request.Builder()
                 .url(link).get().build();
 
-        JSONArray responseArray = null;
+        JsonArray responseArray = null;
         try {
             String responseString = client.newCall(request).execute().body().string();
             if (!responseString.contains("[]")) {
                 if (isCategory) {
-                    responseArray = new JSONArray(responseString);
+                    responseArray = JsonParser.parseString(responseString).getAsJsonArray();
                 } else {
-                    responseArray = new JSONObject(responseString).getJSONArray("response");
+                    responseArray = JsonParser.parseString(responseString).getAsJsonObject().getAsJsonArray("response");
                 }
                 toastMainThread(String.format("Category or availability information downloaded."), context);
             } else {
