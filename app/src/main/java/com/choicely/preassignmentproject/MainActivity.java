@@ -13,6 +13,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        DataLoadingHelper.getInstance(this).downloadCategoryForSaving("facemasks", this);
+        DataLoadingHelper.getInstance().downloadCategoryForSaving("facemasks", this);
     }
 }

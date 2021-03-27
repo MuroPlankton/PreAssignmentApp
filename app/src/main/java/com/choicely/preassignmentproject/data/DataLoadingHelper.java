@@ -31,23 +31,17 @@ public class DataLoadingHelper {
             .writeTimeout(20, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS).build();
 
-    private List<String> alreadyLoadedManufacturers = new ArrayList<>();
-    private int manufacturersSaved = 0;
-
     private BlockingQueue<Runnable> downloadQueue = new LinkedBlockingQueue<>();
     private ThreadPoolExecutor downloadExecutor = new ThreadPoolExecutor(1,
             Runtime.getRuntime().availableProcessors(), 1000,
             TimeUnit.MILLISECONDS, downloadQueue);
 
-    private ExecutorService realmExecutorService = Executors.newSingleThreadExecutor();
-
-    private DataLoadingHelper(Context context) {
-        realmExecutorService.execute(() -> Realm.init(context));
+    private DataLoadingHelper() {
     }
 
-    public static synchronized DataLoadingHelper getInstance(Context context) {
+    public static synchronized DataLoadingHelper getInstance() {
         if (instance == null) {
-            instance = new DataLoadingHelper(context);
+            instance = new DataLoadingHelper();
         }
         return instance;
     }
@@ -64,50 +58,19 @@ public class DataLoadingHelper {
             if (itemCategoryArray == null) {
                 downloadCategoryForSaving(category, activityContext);
             } else {
-                realmExecutorService.execute(() -> saveDownloadedCategory(itemCategoryArray, activityContext));
+                DownloadData categoryData = new DownloadData();
+                categoryData.setType("category");
+                categoryData.setContext(activityContext);
+                categoryData.setDataArray(itemCategoryArray);
+
+                RealmThread realmThread = RealmThread.getInstance(activityContext);
+                realmThread.addDownloadDataToList(categoryData);
+                realmThread.run();
             }
         });
     }
 
-    private void saveDownloadedCategory(JsonArray categoryArray, Context context) {
-        List<String> manufacturerList = alreadyLoadedManufacturers;
-        long startTime = System.currentTimeMillis();
-
-        for (int index = 0; index < categoryArray.size(); index++) {
-            JsonObject itemDataJsonObject = categoryArray.get(index).getAsJsonObject();
-
-            ItemData itemData = new ItemData();
-            itemData.setItemId(itemDataJsonObject.get("id").getAsString());
-            itemData.setItemName(itemDataJsonObject.get("name").getAsString());
-            itemData.setCategory(itemDataJsonObject.get("type").getAsString());
-            itemData.setPrice(itemDataJsonObject.get("price").getAsInt());
-
-            String itemManufacturer = itemDataJsonObject.get("manufacturer").getAsString();
-            itemData.setManufacturer(itemManufacturer);
-            if (!manufacturerList.contains(itemManufacturer)) {
-                manufacturerList.add(itemManufacturer);
-                downloadManufacturerAvailabilityForSaving(itemManufacturer, context);
-            }
-
-            JsonArray itemColorJsonArray = itemDataJsonObject.getAsJsonArray("color");
-            RealmList<String> itemColorList = new RealmList<>();
-            for (int i = 0; i < itemColorJsonArray.size(); i++) {
-                itemColorList.add(itemColorJsonArray.get(i).getAsString());
-            }
-            itemData.setItemColor(itemColorList);
-
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
-            realm.copyToRealmOrUpdate(itemData);
-            realm.commitTransaction();
-        }
-
-        Log.d("DataLoadingHelper", "saveDownloadedCategory: amount of seconds it took to save downloaded category: " + (System.currentTimeMillis() - startTime) / 1000);
-        alreadyLoadedManufacturers = manufacturerList;
-        toastMainThread("Almost there! Loading...", context);
-    }
-
-    private void downloadManufacturerAvailabilityForSaving(String manufacturer, Context context) {
+    public void downloadManufacturerAvailabilityForSaving(String manufacturer, Context context) {
         downloadExecutor.submit(() -> {
             final JsonArray availabilityArray = requestData(
                     String.format("https://bad-api-assignment.reaktor.com/v2/availability/%s",
@@ -116,35 +79,16 @@ public class DataLoadingHelper {
             if (availabilityArray == null) {
                 downloadManufacturerAvailabilityForSaving(manufacturer, context);
             } else {
-                realmExecutorService.execute(() -> {
-                    saveDownloadedAvailabilityInfo(availabilityArray, context);
-                });
+                DownloadData availabilityData = new DownloadData();
+                availabilityData.setType("manufacturer");
+                availabilityData.setContext(context);
+                availabilityData.setDataArray(availabilityArray);
+
+                RealmThread realmThread = RealmThread.getInstance(context);
+                realmThread.addDownloadDataToList(availabilityData);
+                realmThread.run();
             }
         });
-    }
-
-    private void saveDownloadedAvailabilityInfo(JsonArray availabilityArray, Context context) {
-        long startTime = System.currentTimeMillis();
-        for (int index = 0; index < availabilityArray.size(); index++) {
-            JsonObject itemDataJsonObject = availabilityArray.get(index).getAsJsonObject();
-
-            ItemData itemData = new ItemData();
-            itemData.setItemId(itemDataJsonObject.get("id").getAsString().toLowerCase());
-
-            String dataPayload = itemDataJsonObject.get("DATAPAYLOAD").getAsString();
-            itemData.setAvailable(!dataPayload.contains("OUTOFSTOCK"));
-
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
-            realm.copyToRealmOrUpdate(itemData);
-            realm.commitTransaction();
-        }
-
-        Log.d("DataLoadingHelper", "saveDownloadedAvailabilityInfo: one manufacturer saved to realm in " + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
-        manufacturersSaved++;
-        if (manufacturersSaved == alreadyLoadedManufacturers.size() - 1) {
-            toastMainThread("All of the data has been saved!", context);
-        }
     }
 
     private JsonArray requestData(String link, Context context, boolean isCategory) {
