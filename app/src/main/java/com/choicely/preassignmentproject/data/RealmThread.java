@@ -38,12 +38,10 @@ public class RealmThread extends Thread {
 
     public void addDownloadDataToList(DownloadData downloadData) {
         downloadDataList.add(downloadData);
-        Log.d(TAG, "addDownloadDataToList: List size: " + downloadDataList.size());
     }
 
     @Override
     public void run() {
-        Log.d(TAG, "run: Run method called");
         if (downloadDataList.size() > 0) {
             DownloadData dataToHandle = downloadDataList.get(0);
             downloadDataList.remove(0);
@@ -70,8 +68,16 @@ public class RealmThread extends Thread {
         for (int index = 0; index < categoryArray.size(); index++) {
             JsonObject itemDataJsonObject = categoryArray.get(index).getAsJsonObject();
 
-            ItemData itemData = new ItemData();
-            itemData.setItemId(itemDataJsonObject.get("id").getAsString());
+            Realm realm = Realm.getDefaultInstance();
+            realm.beginTransaction();
+            String itemID = itemDataJsonObject.get("id").getAsString().toLowerCase();
+            ItemData itemData = realm.where(ItemData.class).equalTo("itemId", itemID).findFirst();
+
+            if (itemData == null) {
+                itemData = new ItemData();
+                itemData.setItemId(itemID);
+            }
+
             itemData.setItemName(itemDataJsonObject.get("name").getAsString());
             itemData.setCategory(itemDataJsonObject.get("type").getAsString());
             itemData.setPrice(itemDataJsonObject.get("price").getAsInt());
@@ -92,8 +98,6 @@ public class RealmThread extends Thread {
             }
             itemData.setItemColor(itemColorList);
 
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
             realm.copyToRealmOrUpdate(itemData);
             realm.commitTransaction();
         }
@@ -109,19 +113,24 @@ public class RealmThread extends Thread {
         for (int index = 0; index < availabilityArray.size(); index++) {
             JsonObject itemDataJsonObject = availabilityArray.get(index).getAsJsonObject();
 
-            ItemData itemData = new ItemData();
-            itemData.setItemId(itemDataJsonObject.get("id").getAsString().toLowerCase());
+            Realm realm = Realm.getDefaultInstance();
+            realm.beginTransaction();
+            String itemID = itemDataJsonObject.get("id").getAsString().toLowerCase();
+            ItemData itemData = realm.where(ItemData.class).equalTo("itemId", itemID).findFirst();
+
+            if (itemData == null) {
+                itemData = new ItemData();
+                itemData.setItemId(itemID);
+            }
 
             String dataPayload = itemDataJsonObject.get("DATAPAYLOAD").getAsString();
             itemData.setAvailable(!dataPayload.contains("OUTOFSTOCK"));
 
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
             realm.copyToRealmOrUpdate(itemData);
             realm.commitTransaction();
         }
         manufacturersSaved++;
-        Log.d(TAG, "saveDownloadedAvailabilityInfo: one manufacturer saved to realm in "
+        Log.d(TAG, "saveDownloadedManufacturerAvailabilityInfo: one manufacturer saved to realm in "
                         + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
 
         //TODO: data should be updated to user at this point
