@@ -124,7 +124,8 @@ public class RealmThread extends Thread {
             }
 
             String dataPayload = itemDataJsonObject.get("DATAPAYLOAD").getAsString();
-            itemData.setAvailable(!dataPayload.contains("OUTOFSTOCK"));
+            itemData.setAvailability(DataPayloadXMLParser.parseDataPayloadXML(dataPayload));
+
 
             realm.copyToRealmOrUpdate(itemData);
             realm.commitTransaction();

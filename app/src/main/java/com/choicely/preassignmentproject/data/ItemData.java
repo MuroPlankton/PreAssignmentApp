@@ -17,14 +17,14 @@ public class ItemData extends RealmObject {
     private int price;
     private String manufacturer;
     private String category;
-    private boolean isAvailable;
+    private String availability;
 
-    public void setAvailable(boolean available) {
-        isAvailable = available;
+    public String getAvailability() {
+        return availability;
     }
 
-    public boolean isAvailable() {
-        return isAvailable;
+    public void setAvailability(String availability) {
+        this.availability = availability;
     }
 
     public String getItemId() {
