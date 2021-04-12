@@ -19,6 +19,10 @@ public class ItemData extends RealmObject {
     private String category;
     private String availability;
 
+    public ItemData() {
+        this.availability = "Availability to be loaded";
+    }
+
     public String getAvailability() {
         return availability;
     }

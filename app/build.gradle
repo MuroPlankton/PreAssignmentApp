@@ -40,4 +40,5 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     implementation 'com.google.code.gson:gson:2.8.6'
     implementation group: 'commons-io', name: 'commons-io', version: '2.4'
+    implementation "androidx.viewpager2:viewpager2:1.0.0"
 }
