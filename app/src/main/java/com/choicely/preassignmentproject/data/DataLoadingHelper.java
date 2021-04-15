@@ -2,24 +2,17 @@ package com.choicely.preassignmentproject.data;
 
 import android.app.Activity;
 import android.content.Context;
-import android.util.Log;
+import android.os.Handler;
 import android.widget.Toast;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import io.realm.Realm;
-import io.realm.RealmList;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 
@@ -50,18 +43,19 @@ public class DataLoadingHelper {
         ((Activity) activityContext).runOnUiThread(() -> Toast.makeText(activityContext, message, Toast.LENGTH_LONG).show());
     }
 
-    public void downloadCategoryForSaving(String category, Context activityContext) {
+    public void downloadCategoryForSaving(String category, Context activityContext, Handler handler) {
         downloadExecutor.execute(() -> {
             final JsonArray itemCategoryArray = requestData(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
                     category), activityContext, true);
 
             if (itemCategoryArray == null) {
-                downloadCategoryForSaving(category, activityContext);
+                downloadCategoryForSaving(category, activityContext, handler);
             } else {
                 DownloadData categoryData = new DownloadData();
                 categoryData.setType("category");
                 categoryData.setContext(activityContext);
                 categoryData.setDataArray(itemCategoryArray);
+                categoryData.setHandler(handler);
 
                 RealmThread realmThread = RealmThread.getInstance(activityContext);
                 realmThread.addDownloadDataToList(categoryData);

@@ -31,6 +31,5 @@ public class MainActivity extends AppCompatActivity {
         categoriesAdapter = new CategoriesAdapter(this, categories);
         viewPager2.setAdapter(categoriesAdapter);
 
-//        DataLoadingHelper.getInstance().downloadCategoryForSaving("gloves", this);
     }
 }

@@ -1,7 +1,9 @@
 package com.choicely.preassignmentproject.data;
 
 import android.content.Context;
+import android.os.Handler;
 import android.util.Log;
+import android.util.Pair;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -17,6 +19,7 @@ public class RealmThread extends Thread {
     private static RealmThread instance;
     private List<String> alreadyLoadedManufacturers = new ArrayList<>();
     private int manufacturersSaved = 0;
+    private List<Pair<Handler, String>> returnLocationInfoList = new ArrayList<>();
 
     private List<DownloadData> downloadDataList = new ArrayList<>();
 
@@ -64,7 +67,9 @@ public class RealmThread extends Thread {
 
     private void saveDownloadedCategory(DownloadData dataToHandle) {
         long startTime = System.currentTimeMillis();
+        returnLocationInfoList.add(new Pair<Handler, String>(dataToHandle.getHandler(), dataToHandle.getType()));
         JsonArray categoryArray = dataToHandle.getDataArray();
+        String category = categoryArray.get(0).getAsJsonObject().get("type").getAsString();
         for (int index = 0; index < categoryArray.size(); index++) {
             JsonObject itemDataJsonObject = categoryArray.get(index).getAsJsonObject();
 
@@ -104,7 +109,14 @@ public class RealmThread extends Thread {
         Log.d(TAG, "saveDownloadedCategory: amount of seconds it took to save downloaded category: "
                         + (System.currentTimeMillis() - startTime) / 1000);
 
-        //TODO: data should be updated to user at this point
+        sendCateGoryToUI(dataToHandle.getHandler(), category);
+    }
+
+    private void sendCateGoryToUI(Handler handler, String category) {
+        Realm realm = Realm.getDefaultInstance();
+        final List<ItemData> finalCategoryItemDataList = realm.copyFromRealm(
+                realm.where(ItemData.class).equalTo("category", category).findAll());
+        handler.obtainMessage(0, finalCategoryItemDataList).sendToTarget();
     }
 
     private void saveDownloadedManufacturerAvailabilityInfo(DownloadData dataToHandle) {

@@ -1,5 +1,6 @@
 package com.choicely.preassignmentproject;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,6 +16,8 @@ import java.util.List;
 
 public class ClothesInfoAdapter extends RecyclerView.Adapter<ClothesInfoAdapter.InfoViewHolder> {
 
+    private static final String TAG = "ClothesInfoAdapter";
+
     private List<ItemData> items = new ArrayList<>();
 
     @NonNull
@@ -28,11 +31,13 @@ public class ClothesInfoAdapter extends RecyclerView.Adapter<ClothesInfoAdapter.
         ItemData itemData = items.get(position);
         holder.name.setText(itemData.getItemName());
         holder.manufacturer.setText(itemData.getManufacturer());
-        holder.price.setText(itemData.getPrice());
+        holder.price.setText(String.format("%d€", itemData.getPrice()));
         List<String> colorList = itemData.getItemColor();
         String colors = colorList.get(0);
-        for (int index = 1; index < colorList.size(); index++) {
-            colors += String.format(" ,%s", colorList.get(index));
+        if (colorList.size() > 1) {
+            for (int index = 1; index < colorList.size(); index++) {
+                colors += String.format(" ,%s", colorList.get(index));
+            }
         }
         holder.color.setText(colors);
         holder.availability.setText(itemData.getAvailability());

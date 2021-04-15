@@ -1,6 +1,7 @@
 package com.choicely.preassignmentproject;
 
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
@@ -10,6 +11,8 @@ import androidx.viewpager2.adapter.FragmentStateAdapter;
 import java.util.List;
 
 public class CategoriesAdapter extends FragmentStateAdapter {
+
+    private static final String TAG = "CategoriesAdapter";
 
     private List<String> categories;
 
@@ -21,7 +24,7 @@ public class CategoriesAdapter extends FragmentStateAdapter {
     @NonNull
     @Override
     public Fragment createFragment(int position) {
-        CategoryFragment fragment = new CategoryFragment();
+        CategoryFragment fragment = new CategoryFragment(categories);
         Bundle data = new Bundle();
         data.putString("category", categories.get(position));
         fragment.setArguments(data);

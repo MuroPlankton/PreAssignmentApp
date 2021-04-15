@@ -1,6 +1,7 @@
 package com.choicely.preassignmentproject.data;
 
 import android.content.Context;
+import android.os.Handler;
 
 import com.google.gson.JsonArray;
 
@@ -9,6 +10,15 @@ public class DownloadData {
     private JsonArray dataArray;
     private Context context;
     private String type;
+    private Handler handler;
+
+    public Handler getHandler() {
+        return handler;
+    }
+
+    public void setHandler(Handler handler) {
+        this.handler = handler;
+    }
 
     public JsonArray getDataArray() {
         return dataArray;
