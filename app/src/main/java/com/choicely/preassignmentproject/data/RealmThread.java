@@ -18,7 +18,6 @@ public class RealmThread extends Thread {
     private static final String TAG = "RealmThread";
     private static RealmThread instance;
     private List<String> alreadyLoadedManufacturers = new ArrayList<>();
-    private int manufacturersSaved = 0;
     private List<Pair<Handler, String>> returnLocationInfoList = new ArrayList<>();
 
     private List<DownloadData> downloadDataList = new ArrayList<>();
@@ -60,6 +59,9 @@ public class RealmThread extends Thread {
                     case "manufacturer":
                         saveDownloadedManufacturerAvailabilityInfo(dataToHandle);
                         break;
+                    case "load":
+                        sendCateGoryToUI(new Pair<>(dataToHandle.getHandler(), dataToHandle.getCategory()));
+                        break;
                 }
             }
         }
@@ -67,9 +69,18 @@ public class RealmThread extends Thread {
 
     private void saveDownloadedCategory(DownloadData dataToHandle) {
         long startTime = System.currentTimeMillis();
-        returnLocationInfoList.add(new Pair<Handler, String>(dataToHandle.getHandler(), dataToHandle.getType()));
+        boolean isCategoryAlreadyInList = false;
         JsonArray categoryArray = dataToHandle.getDataArray();
         String category = categoryArray.get(0).getAsJsonObject().get("type").getAsString();
+
+        for (Pair<Handler, String> pair : returnLocationInfoList) {
+            isCategoryAlreadyInList = category.equals(pair.second);
+        }
+        Pair<Handler, String> returnInfo = new Pair<Handler, String>(dataToHandle.getHandler(), category);
+        if (!isCategoryAlreadyInList) {
+            returnLocationInfoList.add(returnInfo);
+        }
+
         for (int index = 0; index < categoryArray.size(); index++) {
             JsonObject itemDataJsonObject = categoryArray.get(index).getAsJsonObject();
 
@@ -109,14 +120,16 @@ public class RealmThread extends Thread {
         Log.d(TAG, "saveDownloadedCategory: amount of seconds it took to save downloaded category: "
                         + (System.currentTimeMillis() - startTime) / 1000);
 
-        sendCateGoryToUI(dataToHandle.getHandler(), category);
+        sendCateGoryToUI(returnInfo);
     }
 
-    private void sendCateGoryToUI(Handler handler, String category) {
+    private void sendCateGoryToUI(Pair<Handler, String> returnInfo) {
         Realm realm = Realm.getDefaultInstance();
-        final List<ItemData> finalCategoryItemDataList = realm.copyFromRealm(
-                realm.where(ItemData.class).equalTo("category", category).findAll());
-        handler.obtainMessage(0, finalCategoryItemDataList).sendToTarget();
+        final List<ItemData> finalCategoryItemDataList = realm
+                .copyFromRealm(realm.where(ItemData.class)
+                        .equalTo("category", returnInfo.second)
+                        .findAll());
+        returnInfo.first.obtainMessage(0, finalCategoryItemDataList).sendToTarget();
     }
 
     private void saveDownloadedManufacturerAvailabilityInfo(DownloadData dataToHandle) {
@@ -142,10 +155,11 @@ public class RealmThread extends Thread {
             realm.copyToRealmOrUpdate(itemData);
             realm.commitTransaction();
         }
-        manufacturersSaved++;
         Log.d(TAG, "saveDownloadedManufacturerAvailabilityInfo: one manufacturer saved to realm in "
                         + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
 
-        //TODO: data should be updated to user at this point
+        for (Pair<Handler, String> pair : returnLocationInfoList) {
+            sendCateGoryToUI(pair);
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.choicely.preassignmentproject;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -19,7 +21,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.choicely.preassignmentproject.data.DataLoadingHelper;
+import com.choicely.preassignmentproject.data.DownloadData;
 import com.choicely.preassignmentproject.data.ItemData;
+import com.choicely.preassignmentproject.data.RealmThread;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
@@ -52,7 +56,23 @@ public class CategoryFragment extends Fragment implements Handler.Callback {
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(manager);
 
-        DataLoadingHelper.getInstance().downloadCategoryForSaving(getArguments().getString("category"), getContext(), handler);
+        SharedPreferences preferences = getContext().getSharedPreferences(getString(R.string.preference_file_key), Context.MODE_PRIVATE);
+        long lastLoadTimeInMillis = preferences.getLong(getString(R.string.last_load_preference), -1);
+        if (System.currentTimeMillis() - lastLoadTimeInMillis > 300000) {
+            DataLoadingHelper.getInstance().downloadCategoryForSaving(getArguments().getString("category"), getContext(), handler);
+            SharedPreferences.Editor editor = preferences.edit();
+            editor.putLong(getString(R.string.last_load_preference), System.currentTimeMillis());
+            editor.apply();
+        } else {
+            DownloadData loadData = new DownloadData();
+            loadData.setType("load");
+            loadData.setHandler(handler);
+            loadData.setCategory(getArguments().getString("category"));
+            loadData.setContext(getContext());
+            RealmThread realmThread = RealmThread.getInstance(getContext());
+            realmThread.addDownloadDataToList(loadData);
+            realmThread.run();
+        }
 
         return view;
     }

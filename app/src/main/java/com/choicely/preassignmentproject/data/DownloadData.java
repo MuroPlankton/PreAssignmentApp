@@ -10,7 +10,16 @@ public class DownloadData {
     private JsonArray dataArray;
     private Context context;
     private String type;
+    private String category;
     private Handler handler;
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
 
     public Handler getHandler() {
         return handler;
