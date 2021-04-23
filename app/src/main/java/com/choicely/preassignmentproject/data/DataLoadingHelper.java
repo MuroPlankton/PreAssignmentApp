@@ -1,9 +1,6 @@
 package com.choicely.preassignmentproject.data;
 
-import android.app.Activity;
 import android.content.Context;
-import android.os.Handler;
-import android.widget.Toast;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
@@ -39,23 +36,17 @@ public class DataLoadingHelper {
         return instance;
     }
 
-    private void toastMainThread(String message, Context activityContext) {
-        ((Activity) activityContext).runOnUiThread(() -> Toast.makeText(activityContext, message, Toast.LENGTH_LONG).show());
-    }
-
-    public void downloadCategoryForSaving(String category, Context activityContext, Handler handler) {
+    public void downloadCategoryForSaving(String category, Context activityContext) {
         downloadExecutor.execute(() -> {
             final JsonArray itemCategoryArray = requestData(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
                     category), activityContext, true);
 
             if (itemCategoryArray == null) {
-                downloadCategoryForSaving(category, activityContext, handler);
+                downloadCategoryForSaving(category, activityContext);
             } else {
-                DownloadData categoryData = new DownloadData();
+                DownloadData categoryData = new DownloadData(activityContext);
                 categoryData.setType("category");
-                categoryData.setContext(activityContext);
                 categoryData.setDataArray(itemCategoryArray);
-                categoryData.setHandler(handler);
 
                 RealmThread realmThread = RealmThread.getInstance(activityContext);
                 realmThread.addDownloadDataToList(categoryData);
@@ -73,9 +64,8 @@ public class DataLoadingHelper {
             if (availabilityArray == null) {
                 downloadManufacturerAvailabilityForSaving(manufacturer, context);
             } else {
-                DownloadData availabilityData = new DownloadData();
+                DownloadData availabilityData = new DownloadData(context);
                 availabilityData.setType("manufacturer");
-                availabilityData.setContext(context);
                 availabilityData.setDataArray(availabilityArray);
 
                 RealmThread realmThread = RealmThread.getInstance(context);
@@ -98,9 +88,7 @@ public class DataLoadingHelper {
                 } else {
                     responseArray = JsonParser.parseString(responseString).getAsJsonObject().getAsJsonArray("response");
                 }
-                toastMainThread(String.format("Category or availability information downloaded."), context);
             } else {
-                toastMainThread(String.format("Couldn't download data! Trying again..."), context);
                 Thread.sleep(5000);
                 return null;
             }

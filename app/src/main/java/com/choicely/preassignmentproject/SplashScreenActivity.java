@@ -11,7 +11,6 @@ public class SplashScreenActivity extends Activity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         startActivity(new Intent(this, MainActivity.class));
     }
 }

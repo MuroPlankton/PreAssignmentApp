@@ -5,8 +5,6 @@ import android.util.Log;
 
 import com.choicely.preassignmentproject.data.RealmThread;
 
-import io.realm.Realm;
-
 public class PreAssignmentApplication extends Application {
     private static final String TAG = "PreAssignmentApp";
 

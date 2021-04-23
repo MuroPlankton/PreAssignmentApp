@@ -2,4 +2,10 @@
     <string name="app_name">PreAssignmentProject</string>
     <string name="preference_file_key">preAssignmentProjectAppLastDataDownloadFile</string>
     <string name="last_load_preference">preAssignmentProjectAppLastDataDownloadTime</string>
+
+    <string-array name="categories">
+        <item>gloves</item>
+        <item>facemasks</item>
+        <item>beanies</item>
+    </string-array>
 </resources>

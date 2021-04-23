@@ -13,6 +13,10 @@ public class DownloadData {
     private String category;
     private Handler handler;
 
+    public DownloadData(Context context) {
+        this.context = context;
+    }
+
     public String getCategory() {
         return category;
     }

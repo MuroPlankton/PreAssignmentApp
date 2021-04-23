@@ -36,7 +36,7 @@ public class ClothesInfoAdapter extends RecyclerView.Adapter<ClothesInfoAdapter.
         String colors = colorList.get(0);
         if (colorList.size() > 1) {
             for (int index = 1; index < colorList.size(); index++) {
-                colors += String.format(" ,%s", colorList.get(index));
+                colors += String.format(", %s", colorList.get(index));
             }
         }
         holder.color.setText(colors);

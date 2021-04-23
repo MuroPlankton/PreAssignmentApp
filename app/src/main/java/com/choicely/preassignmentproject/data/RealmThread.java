@@ -3,13 +3,17 @@ package com.choicely.preassignmentproject.data;
 import android.content.Context;
 import android.os.Handler;
 import android.util.Log;
-import android.util.Pair;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import io.realm.Realm;
 import io.realm.RealmList;
@@ -17,14 +21,13 @@ import io.realm.RealmList;
 public class RealmThread extends Thread {
     private static final String TAG = "RealmThread";
     private static RealmThread instance;
-    private List<String> alreadyLoadedManufacturers = new ArrayList<>();
-    private List<Pair<Handler, String>> returnLocationInfoList = new ArrayList<>();
+    private Map<String, Handler> dataReturnLocationMap = Collections.synchronizedMap(new HashMap<>());
 
-    private List<DownloadData> downloadDataList = new ArrayList<>();
+    private List<DownloadData> downloadDataList = Collections.synchronizedList(new ArrayList<>());
+    private List<String> alreadyLoadedManufacturers = new ArrayList<>();
 
     private RealmThread(Context ctx) {
-        DownloadData initData = new DownloadData();
-        initData.setContext(ctx);
+        DownloadData initData = new DownloadData(ctx);
         initData.setType("init");
         downloadDataList.add(initData);
         start();
@@ -36,6 +39,12 @@ public class RealmThread extends Thread {
             instance = new RealmThread(ctx);
         }
         return instance;
+    }
+
+    public void addReturnLocation(String category, Handler communicationsHandler) {
+        if (!dataReturnLocationMap.containsKey(category)) {
+            dataReturnLocationMap.put(category, communicationsHandler);
+        }
     }
 
     public void addDownloadDataToList(DownloadData downloadData) {
@@ -60,8 +69,10 @@ public class RealmThread extends Thread {
                         saveDownloadedManufacturerAvailabilityInfo(dataToHandle);
                         break;
                     case "load":
-                        sendCateGoryToUI(new Pair<>(dataToHandle.getHandler(), dataToHandle.getCategory()));
+                        updateDataToUI();
                         break;
+                    case "clear":
+                        clearData();
                 }
             }
         }
@@ -69,23 +80,11 @@ public class RealmThread extends Thread {
 
     private void saveDownloadedCategory(DownloadData dataToHandle) {
         long startTime = System.currentTimeMillis();
-        boolean isCategoryAlreadyInList = false;
         JsonArray categoryArray = dataToHandle.getDataArray();
-        String category = categoryArray.get(0).getAsJsonObject().get("type").getAsString();
-
-        for (Pair<Handler, String> pair : returnLocationInfoList) {
-            isCategoryAlreadyInList = category.equals(pair.second);
-        }
-        Pair<Handler, String> returnInfo = new Pair<Handler, String>(dataToHandle.getHandler(), category);
-        if (!isCategoryAlreadyInList) {
-            returnLocationInfoList.add(returnInfo);
-        }
-
+        Realm realm = Realm.getDefaultInstance();
+        realm.beginTransaction();
         for (int index = 0; index < categoryArray.size(); index++) {
             JsonObject itemDataJsonObject = categoryArray.get(index).getAsJsonObject();
-
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
             String itemID = itemDataJsonObject.get("id").getAsString().toLowerCase();
             ItemData itemData = realm.where(ItemData.class).equalTo("itemId", itemID).findFirst();
 
@@ -115,31 +114,41 @@ public class RealmThread extends Thread {
             itemData.setItemColor(itemColorList);
 
             realm.copyToRealmOrUpdate(itemData);
-            realm.commitTransaction();
         }
+        realm.commitTransaction();
         Log.d(TAG, "saveDownloadedCategory: amount of seconds it took to save downloaded category: "
-                        + (System.currentTimeMillis() - startTime) / 1000);
+                + (System.currentTimeMillis() - startTime) / 1000);
 
-        sendCateGoryToUI(returnInfo);
+        updateDataToUI();
     }
 
-    private void sendCateGoryToUI(Pair<Handler, String> returnInfo) {
+    private void updateDataToUI() {
         Realm realm = Realm.getDefaultInstance();
-        final List<ItemData> finalCategoryItemDataList = realm
-                .copyFromRealm(realm.where(ItemData.class)
-                        .equalTo("category", returnInfo.second)
-                        .findAll());
-        returnInfo.first.obtainMessage(0, finalCategoryItemDataList).sendToTarget();
+        Set returnLocationKeySet = dataReturnLocationMap.keySet();
+        synchronized (dataReturnLocationMap) {
+            Iterator iterator = returnLocationKeySet.iterator();
+            while (iterator.hasNext()) {
+                String category = iterator.next().toString();
+                final List<ItemData> finalCategoryItemDataList = realm
+                        .copyFromRealm(realm.where(ItemData.class)
+                                .equalTo("category", category)
+                                .findAll());
+
+                if (finalCategoryItemDataList != null && !finalCategoryItemDataList.isEmpty() && finalCategoryItemDataList.size() > 0) {
+                    dataReturnLocationMap.get(category).obtainMessage(0, finalCategoryItemDataList).sendToTarget();
+                }
+            }
+        }
     }
 
     private void saveDownloadedManufacturerAvailabilityInfo(DownloadData dataToHandle) {
         long startTime = System.currentTimeMillis();
         JsonArray availabilityArray = dataToHandle.getDataArray();
+        Realm realm = Realm.getDefaultInstance();
+        realm.beginTransaction();
         for (int index = 0; index < availabilityArray.size(); index++) {
             JsonObject itemDataJsonObject = availabilityArray.get(index).getAsJsonObject();
 
-            Realm realm = Realm.getDefaultInstance();
-            realm.beginTransaction();
             String itemID = itemDataJsonObject.get("id").getAsString().toLowerCase();
             ItemData itemData = realm.where(ItemData.class).equalTo("itemId", itemID).findFirst();
 
@@ -153,13 +162,18 @@ public class RealmThread extends Thread {
 
 
             realm.copyToRealmOrUpdate(itemData);
-            realm.commitTransaction();
         }
+        realm.commitTransaction();
         Log.d(TAG, "saveDownloadedManufacturerAvailabilityInfo: one manufacturer saved to realm in "
-                        + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
+                + (System.currentTimeMillis() - startTime) / 1000 + " seconds");
 
-        for (Pair<Handler, String> pair : returnLocationInfoList) {
-            sendCateGoryToUI(pair);
-        }
+        updateDataToUI();
+    }
+
+    private void clearData() {
+        Realm realm = Realm.getDefaultInstance();
+        realm.beginTransaction();
+        realm.deleteAll();
+        realm.commitTransaction();
     }
 }
