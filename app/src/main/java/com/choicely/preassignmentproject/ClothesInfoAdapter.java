@@ -32,6 +32,8 @@ public class ClothesInfoAdapter extends RecyclerView.Adapter<ClothesInfoAdapter.
         holder.name.setText(itemData.getItemName());
         holder.manufacturer.setText(itemData.getManufacturer());
         holder.price.setText(String.format("%d€", itemData.getPrice()));
+        holder.availability.setText(itemData.getAvailability());
+
         List<String> colorList = itemData.getItemColor();
         String colors = colorList.get(0);
         if (colorList.size() > 1) {
@@ -40,7 +42,6 @@ public class ClothesInfoAdapter extends RecyclerView.Adapter<ClothesInfoAdapter.
             }
         }
         holder.color.setText(colors);
-        holder.availability.setText(itemData.getAvailability());
     }
 
     @Override
@@ -55,6 +56,7 @@ public class ClothesInfoAdapter extends RecyclerView.Adapter<ClothesInfoAdapter.
     public class InfoViewHolder extends RecyclerView.ViewHolder{
 
         public TextView name, manufacturer, price, color, availability;
+
         public InfoViewHolder(@NonNull View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.store_item_content_view_name);

@@ -24,10 +24,11 @@ public class MainActivity extends AppCompatActivity {
     public static TabLayout tabLayout;
     public static ViewPager2 viewPager2;
     private CategoriesAdapter categoriesAdapter;
-    private boolean isCacheTimerUp;
-    DataLoadingHelper dataLoadingHelper = DataLoadingHelper.getInstance();
-    String[] categoriesArray;
 
+    private boolean isCacheTimerUp;
+    List<String> categories;
+
+    DataLoadingHelper dataLoadingHelper = DataLoadingHelper.getInstance();
     RealmThread realmThread = RealmThread.getInstance(this);
     DownloadData realmClearDownloadData;
 
@@ -41,9 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
         viewPager2 = findViewById(R.id.activity_main_pager);
         tabLayout = findViewById(R.id.activity_main_tabs);
-        categoriesArray = getResources().getStringArray(R.array.categories);
-        List<String> categories =
-                new ArrayList<>(Arrays.asList(categoriesArray));
+        categories = new ArrayList<>(Arrays.asList(getResources().getStringArray(R.array.categories)));
         categoriesAdapter = new CategoriesAdapter(this, categories);
         viewPager2.setAdapter(categoriesAdapter);
 
@@ -51,10 +50,9 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
         long lastLoadTimeInMillis = preferences.getLong(
                 getString(R.string.last_load_preference), 300001);
-        isCacheTimerUp = System.currentTimeMillis() - lastLoadTimeInMillis > 300000;
-
         Date initialUpdateTime = new Date(System.currentTimeMillis()
-                + (isCacheTimerUp ? 0 : System.currentTimeMillis() - lastLoadTimeInMillis));
+                + (System.currentTimeMillis() - lastLoadTimeInMillis > 300000
+                ? 0 : System.currentTimeMillis() - lastLoadTimeInMillis));
 
         startDataUpdateCycle(initialUpdateTime);
     }
@@ -65,9 +63,10 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 realmThread.addDownloadDataToList(realmClearDownloadData);
                 realmThread.run();
-                for (int index = 0; index < categoriesArray.length; index++) {
-                    dataLoadingHelper.downloadCategoryForSaving(categoriesArray[index], getApplicationContext());
+                for (String category : categories) {
+                    dataLoadingHelper.downloadCategoryForSaving(category, getApplicationContext());
                 }
+
                 SharedPreferences sharedPreferences = getSharedPreferences(getString(R.string.preference_file_key), Context.MODE_PRIVATE);
                 SharedPreferences.Editor editor = sharedPreferences.edit();
                 editor.putLong(getString(R.string.last_load_preference), System.currentTimeMillis());

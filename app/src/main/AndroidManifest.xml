@@ -15,8 +15,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PreAssignmentProject"
         >
-        <activity android:name=".MainActivity"/>
-        <activity android:name=".SplashScreenActivity" android:theme="@style/SplashScreenTheme">
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

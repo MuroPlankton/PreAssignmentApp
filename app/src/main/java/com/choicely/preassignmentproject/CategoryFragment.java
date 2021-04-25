@@ -52,13 +52,13 @@ public class CategoryFragment extends Fragment implements Handler.Callback {
         recyclerView.setAdapter(adapter);
         recyclerView.setLayoutManager(manager);
 
+        RealmThread realmThread = RealmThread.getInstance(context);
+        realmThread.addReturnLocation(getArguments().getString("category"), handler);
+
         SharedPreferences preferences = context.getSharedPreferences(
                 getString(R.string.preference_file_key), Context.MODE_PRIVATE);
         long lastLoadTimeInMillis = preferences.getLong(
                 getString(R.string.last_load_preference), 300001);
-
-        RealmThread realmThread = RealmThread.getInstance(context);
-        realmThread.addReturnLocation(getArguments().getString("category"), handler);
 
         if (System.currentTimeMillis() - lastLoadTimeInMillis < 300000) {
             DownloadData downloadData = new DownloadData(context);
@@ -66,7 +66,6 @@ public class CategoryFragment extends Fragment implements Handler.Callback {
             realmThread.addDownloadDataToList(downloadData);
             realmThread.run();
         }
-
 
         return view;
     }

@@ -39,7 +39,7 @@ public class DataLoadingHelper {
     public void downloadCategoryForSaving(String category, Context activityContext) {
         downloadExecutor.execute(() -> {
             final JsonArray itemCategoryArray = requestData(String.format("https://bad-api-assignment.reaktor.com/v2/products/%s",
-                    category), activityContext, true);
+                    category), true);
 
             if (itemCategoryArray == null) {
                 downloadCategoryForSaving(category, activityContext);
@@ -59,7 +59,7 @@ public class DataLoadingHelper {
         downloadExecutor.submit(() -> {
             final JsonArray availabilityArray = requestData(
                     String.format("https://bad-api-assignment.reaktor.com/v2/availability/%s",
-                            manufacturer), context, false);
+                            manufacturer), false);
 
             if (availabilityArray == null) {
                 downloadManufacturerAvailabilityForSaving(manufacturer, context);
@@ -75,7 +75,7 @@ public class DataLoadingHelper {
         });
     }
 
-    private JsonArray requestData(String link, Context context, boolean isCategory) {
+    private JsonArray requestData(String link, boolean isCategory) {
         Request request = new Request.Builder()
                 .url(link).get().build();
 
@@ -93,7 +93,7 @@ public class DataLoadingHelper {
                 return null;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            return null;
         }
 
         return responseArray;
